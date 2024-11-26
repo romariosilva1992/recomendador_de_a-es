@@ -1,4 +1,4 @@
-# Recomendador de ações da b3.
+# Recomendador de ações da B3.
 
 E aí, galera! Vou falar um pouco sobre o arquivo recomendador.html que a gente tá desenvolvendo pro nosso projeto. É uma parada bem maneira pra quem curte investir na bolsa.
 
