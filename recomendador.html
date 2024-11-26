@@ -1,0 +1,312 @@
+<html><head><base href="." /><meta charset="utf-8" />
+<title>Analisador de Ações B3 - Recomendações em Tempo Real</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background: #f0f2f5;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.header {
+  background: #1a237e;
+  color: white;
+  padding: 20px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.real-time-badge {
+  background: #4CAF50;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.8em;
+  animation: pulse 2s infinite;
+}
+
+.filters {
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-group label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+.stocks-container {
+  padding: 20px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #dee2e6;
+}
+
+th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+tr:hover {
+  background: #f8f9fa;
+}
+
+.positive {
+  color: #28a745;
+}
+
+.negative {
+  color: #dc3545;
+}
+
+.potential-high {
+  background: #d4edda;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.last-update {
+  text-align: right;
+  padding: 10px 20px;
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+.chart-container {
+  padding: 20px;
+  height: 300px;
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="8" fill="#4CAF50"/>
+      <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>Top 20 Ações B3</h1>
+    <span class="real-time-badge">Tempo Real</span>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <label>Setor</label>
+      <select id="sectorFilter">
+        <option value="">Todos</option>
+        <option value="financeiro">Financeiro</option>
+        <option value="tecnologia">Tecnologia</option>
+        <option value="varejo">Varejo</option>
+        <option value="energia">Energia</option>
+        <option value="mineracao">Mineração</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Potencial Mínimo (%)</label>
+      <input type="number" id="potentialFilter" value="20" min="0" max="100">
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="stockChart"></canvas>
+  </div>
+
+  <div class="stocks-container">
+    <table id="stocksTable">
+      <thead>
+        <tr>
+          <th>Ação</th>
+          <th>Preço Atual</th>
+          <th>Variação (%)</th>
+          <th>P/L</th>
+          <th>DY (%)</th>
+          <th>Potencial (%)</th>
+          <th>Volume</th>
+          <th>Recomendação</th>
+        </tr>
+      </thead>
+      <tbody id="stocksBody">
+      </tbody>
+    </table>
+  </div>
+
+  <div class="last-update" id="lastUpdate"></div>
+</div>
+
+<script>
+// Dados simulados expandidos para 20 ações
+const stocksData = [
+  { ticker: "PETR4", name: "Petrobras PN", sector: "energia", currentPrice: 28.50, variation: 2.3, pe: 3.2, dy: 12.5, potential: 35, volume: "250M", recommendation: "Forte Compra" },
+  { ticker: "VALE3", name: "Vale ON", sector: "mineracao", currentPrice: 68.25, variation: 1.8, pe: 4.8, dy: 10.2, potential: 28, volume: "180M", recommendation: "Compra" },
+  { ticker: "ITUB4", name: "Itaú Unibanco PN", sector: "financeiro", currentPrice: 32.80, variation: 0.5, pe: 8.5, dy: 5.8, potential: 22, volume: "120M", recommendation: "Neutro" },
+  { ticker: "BBDC4", name: "Bradesco PN", sector: "financeiro", currentPrice: 15.90, variation: 1.2, pe: 7.8, dy: 7.2, potential: 25, volume: "150M", recommendation: "Compra" },
+  { ticker: "MGLU3", name: "Magazine Luiza ON", sector: "varejo", currentPrice: 2.80, variation: -1.5, pe: 15.2, dy: 1.2, potential: 40, volume: "80M", recommendation: "Forte Compra" },
+  { ticker: "WEGE3", name: "WEG ON", sector: "tecnologia", currentPrice: 36.50, variation: 0.8, pe: 25.4, dy: 1.8, potential: 15, volume: "45M", recommendation: "Neutro" },
+  { ticker: "RENT3", name: "Localiza ON", sector: "varejo", currentPrice: 58.20, variation: 2.1, pe: 22.1, dy: 2.5, potential: 30, volume: "60M", recommendation: "Compra" },
+  { ticker: "BBAS3", name: "Banco do Brasil ON", sector: "financeiro", currentPrice: 54.30, variation: 1.6, pe: 5.2, dy: 8.5, potential: 32, volume: "90M", recommendation: "Forte Compra" },
+  { ticker: "VIVO4", name: "Telefônica Brasil PN", sector: "tecnologia", currentPrice: 42.15, variation: 0.3, pe: 14.8, dy: 6.2, potential: 18, volume: "40M", recommendation: "Neutro" },
+  { ticker: "ELET3", name: "Eletrobras ON", sector: "energia", currentPrice: 38.90, variation: 1.9, pe: 8.2, dy: 4.8, potential: 28, volume: "70M", recommendation: "Compra" },
+  { ticker: "RAIL3", name: "Rumo ON", sector: "transporte", currentPrice: 18.45, variation: 0.7, pe: 18.5, dy: 2.1, potential: 25, volume: "35M", recommendation: "Compra" },
+  { ticker: "SUZB3", name: "Suzano ON", sector: "papel", currentPrice: 48.75, variation: 1.4, pe: 6.8, dy: 5.5, potential: 32, volume: "55M", recommendation: "Forte Compra" },
+  { ticker: "EQTL3", name: "Equatorial ON", sector: "energia", currentPrice: 28.35, variation: 0.9, pe: 12.4, dy: 3.2, potential: 22, volume: "42M", recommendation: "Neutro" },
+  { ticker: "RADL3", name: "Raia Drogasil ON", sector: "varejo", currentPrice: 24.60, variation: 0.4, pe: 28.5, dy: 0.8, potential: 15, volume: "38M", recommendation: "Neutro" },
+  { ticker: "TOTS3", name: "Totvs ON", sector: "tecnologia", currentPrice: 32.80, variation: 2.5, pe: 32.1, dy: 1.5, potential: 35, volume: "48M", recommendation: "Compra" },
+  { ticker: "CCRO3", name: "CCR ON", sector: "transporte", currentPrice: 12.90, variation: 0.2, pe: 15.8, dy: 4.2, potential: 28, volume: "52M", recommendation: "Compra" },
+  { ticker: "BRFS3", name: "BRF ON", sector: "consumo", currentPrice: 9.85, variation: -0.8, pe: 12.2, dy: 1.8, potential: 42, volume: "65M", recommendation: "Forte Compra" },
+  { ticker: "LREN3", name: "Lojas Renner ON", sector: "varejo", currentPrice: 32.45, variation: 1.1, pe: 24.5, dy: 1.2, potential: 20, volume: "58M", recommendation: "Neutro" },
+  { ticker: "KLBN11", name: "Klabin UNT", sector: "papel", currentPrice: 22.30, variation: 1.3, pe: 8.8, dy: 4.8, potential: 30, volume: "44M", recommendation: "Compra" },
+  { ticker: "EGIE3", name: "Engie Brasil ON", sector: "energia", currentPrice: 42.80, variation: 0.6, pe: 10.2, dy: 6.5, potential: 25, volume: "32M", recommendation: "Compra" }
+];
+
+function filterStocks() {
+  const sector = document.getElementById('sectorFilter').value;
+  const potentialMin = parseFloat(document.getElementById('potentialFilter').value) || 0;
+
+  return stocksData
+    .filter(stock => (!sector || stock.sector === sector) && stock.potential >= potentialMin)
+    .sort((a, b) => b.potential - a.potential);
+}
+
+function updateTable() {
+  const filteredStocks = filterStocks();
+  const tbody = document.getElementById('stocksBody');
+  tbody.innerHTML = '';
+
+  filteredStocks.forEach(stock => {
+    const row = document.createElement('tr');
+    row.classList.toggle('potential-high', stock.potential >= 30);
+    
+    row.innerHTML = `
+      <td>${stock.ticker}</td>
+      <td>R$ ${stock.currentPrice.toFixed(2)}</td>
+      <td class="${stock.variation >= 0 ? 'positive' : 'negative'}">
+        ${stock.variation > 0 ? '+' : ''}${stock.variation.toFixed(2)}%
+      </td>
+      <td>${stock.pe.toFixed(1)}</td>
+      <td>${stock.dy.toFixed(1)}%</td>
+      <td class="${stock.potential >= 0 ? 'positive' : 'negative'}">
+        ${stock.potential.toFixed(1)}%
+      </td>
+      <td>${stock.volume}</td>
+      <td>${stock.recommendation}</td>
+    `;
+    
+    tbody.appendChild(row);
+  });
+
+  updateChart(filteredStocks.slice(0, 10));
+  updateLastUpdate();
+}
+
+function updateChart(stocks) {
+  const ctx = document.getElementById('stockChart').getContext('2d');
+  
+  if (window.stockChart) {
+    window.stockChart.destroy();
+  }
+
+  window.stockChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: stocks.map(stock => stock.ticker),
+      datasets: [{
+        label: 'Potencial de Valorização (%)',
+        data: stocks.map(stock => stock.potential),
+        backgroundColor: stocks.map(stock => 
+          stock.potential >= 30 ? '#28a745' : '#007bff'
+        ),
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Potencial (%)'
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateLastUpdate() {
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent = 
+    `Última atualização: ${now.toLocaleTimeString()}`;
+}
+
+// Simulate real-time updates
+function simulateRealTimeUpdates() {
+  stocksData.forEach(stock => {
+    // Random variation between -2% and 2%
+    const variation = (Math.random() * 4 - 2);
+    stock.currentPrice *= (1 + variation/100);
+    stock.variation = variation;
+    // Slight random changes in potential
+    stock.potential += (Math.random() * 2 - 1);
+  });
+  updateTable();
+}
+
+// Event listeners
+document.getElementById('sectorFilter').addEventListener('change', updateTable);
+document.getElementById('potentialFilter').addEventListener('input', updateTable);
+
+// Initial load
+updateTable();
+
+// Simulate real-time updates every 5 seconds
+setInterval(simulateRealTimeUpdates, 5000);
+</script>
+</body></html>
